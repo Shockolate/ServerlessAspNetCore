@@ -1,63 +1,104 @@
+---
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: |
   An AWS Serverless Application that uses the ASP.NET Core framework running in Amazon Lambda.
 Parameters:
-  ShouldCreateBucket:
+  ServiceNameParameter:
     Type: String
-    AllowedValues:
-    - 'true'
-    - 'false'
-    Description: If true then the S3 bucket that will be proxied will be created with
-      the CloudFormation stack.
-  BucketName:
+    Default: Template
+    Description: Enter the service name. Must be the same as the .csproj for it will be used in referencing the namespace & assembly. Default is Template.
+  EnvironmentParameter:
     Type: String
-    Description: Name of S3 bucket that will be proxied. If left blank a new table
-      will be created.
-    MinLength: '0'
-Conditions:
-  CreateS3Bucket:
-    Fn::Equals:
-    - Ref: ShouldCreateBucket
-    - 'true'
-  BucketNameGenerated:
-    Fn::Equals:
-    - Ref: BucketName
-    - ''
+    Default: dev
+    Description: Enter the environment. Default is dev.
+
+Globals: # Only applies to Severless::Functions
+  Function:
+    Runtime: dotnetcore1.0
+    Timeout: 60
+    MemorySize: 1024
 
 Resources:
-  ServiceFunction:
+  LambdaFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: ServerlessAspNetCore::ServerlessAspNetCore.LambdaEntryPoint::FunctionHandlerAsync
-      Runtime: dotnetcore1.0
+      FunctionName: !Ref ServiceNameParameter
+      Handler: !Sub
+        - ${ServiceNameParameter}::${ServiceNameParameter}.LambdaEntryPoint::FunctionHandlerAsync
       CodeUri: ''
-      MemorySize: 256
-      Timeout: 30
-      Role: 
+      Tracing: passthrough
       Policies:
       - AWSLambdaFullAccess
       Events:
-        ServiceApi:
+        GreedyProxyApiSource:
           Type: Api
           Properties:
-            Path: "/{proxy+}"
+            RestApiId: !Ref ApiGatewayApi
+            Path: /{proxy+}
             Method: ANY
-  
-  ServiceApi:
+
+  ApiGatewayApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: #StageName
+      StageName: !Ref EnvironmentParameter
       DefinitionBody:
-        swagger: 2.0
+        #### INFO ####
+        swagger: '2.0'
         info:
-          title:
-            Ref: AWS::StackName
-          paths:
-            "/{proxy+}":
-              x-amazon-apigateway-any-method:
-                parameters:
-                - name: proxy
-                  in: "path"
-                  required: true
-                  type: "string"
+          title: !Ref ServiceNameParameter
+        schemes:
+        - https
+        consumes:
+        - application/json
+        produces:
+        - application/json
+
+        #### PATHS ####
+        paths:
+          #### "Health Check" ####
+          /ping:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseTemplates:
+                      application/json: '"pong"'
+                passthroughBehavior: when_no_match
+                type: mock
+
+          #### Swagger UI ####
+          /swagger:
+            get:
+              responses: {}
+            x-amazon-apigateway-integration:
+              uri: 
+
+
+          /{proxy+}:
+            x-amazon-apigateway-any-method:
+              parameters:
+              - name: proxy
+                in: 'path'
+                required: true
+                type: 'string'
+              responses: {}
+              x-ama
+
+
+            x-amazon-apigateway-integration:
+              uri: !Sub
+                - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}:${EnvironmentParameter}/invocations:
+  
+Outputs:
+  ApiUrl:
+    Description: !Sub
+      - The URL of the ${ServiceNameParameter} API endpoint.
+    Value: !Sub
+      - https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentParameter}
+  
+    
