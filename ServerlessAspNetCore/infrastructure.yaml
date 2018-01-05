@@ -1,0 +1,172 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  An AWS Serverless Application that uses the ASP.NET Core framework running in Amazon Lambda.
+Parameters:
+  ServiceNameParameter:
+    Type: String
+    Default: Template
+    Description: Enter the service name. Must be the same as the .csproj for it will be used in referencing the namespace & assembly. Default is Template.
+  EnvironmentParameter:
+    Type: String
+    Default: dev
+    Description: Enter the environment. Default is dev.
+
+Globals: # Only applies to Severless::Functions
+  Function:
+    Runtime: dotnetcore1.0
+    Timeout: 60
+    MemorySize: 1024
+    VpcConfig:
+      SecurityGroupIds:
+      SubnetIds:
+      - !ImportValue SubnetPrivate1a
+      - !ImportValue SubnetPrivate1b
+      - !ImportValue SubnetPrivate1c
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref ServiceNameParameter
+      Handler: !Sub
+        - ${ServiceNameParameter}::${ServiceNameParameter}.LambdaEntryPoint::FunctionHandlerAsync
+      CodeUri: ''
+      Tracing: passthrough
+      Policies:
+      - AWSLambdaFullAccess
+      Events:
+        GreedyProxyApiSource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGatewayApi
+            Path: /{proxy+}
+            Method: ANY
+
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref EnvironmentParameter
+      DefinitionBody:
+        #### INFO ####
+        swagger: '2.0'
+        info:
+          title: !Ref ServiceNameParameter
+        schemes:
+        - https
+        consumes:
+        - application/json
+        produces:
+        - application/json
+
+        #### PATHS ####
+        paths:
+          #### "Health Check" ####
+          /ping:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseTemplates:
+                      application/json: '"pong"'
+                passthroughBehavior: when_no_match
+                type: mock
+
+          #### Swagger UI ####
+          /swagger:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Ref SwaggerUIEndpoint
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '"POST,GET,OPTIONS"'
+                      method.response.header.Content-Type: integration.response.header.Content-Type
+                      method.response.header.X-Requested-With: '"*""'
+                      method.response.header.Access-Control-Allow-Headers: '"Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with"'
+                      method.response.header.Access-Control-Allow-Origin: '"*"':
+                passthroughBehavior: when_no_match
+                httpMethod: GET
+                type: http
+            options:
+              responses: {}
+              x-amazon-apigateway-integration:
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '"POST,GET,OPTIONS"'
+                      method.response.header.X-Requested-With: '"*"'
+                      method.response.header.Access-Control-Allow-Headers: '"Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with"'
+                      method.response.header.Access-Control-Allow-Origin: '"*"'
+                passthroughBehavior: when_no_match
+                type: mock
+
+          /swagger/file:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Ref SwaggerFileS3Location
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '"POST,GET,OPTIONS"'
+                      method.response.header.Content-Type: integration.response.response.header.Content-Type
+                      method.response.header.X-Requested-With: '"*"'
+                      method.response.header.Access-Control-Allow-Headers: '"Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with"'
+                      method.response.header.Access-Control-Allow-Origin: '"*"'
+                passthroughBehavior: when_no_match
+                httpMethod: GET
+                type: http
+            options:
+              responses: {}
+              x-amazon-apigateway-integration:
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '"POST,GET,OPTIONS"'
+                      method.response.header.X-Requested-With: '"*"'
+                      method.response.header.Access-Control-Allow-Headers: '"Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with"'
+                      method.response.header.Access-Control-Allow-Origin: '"*"'
+                passthroughBehavior: when_no_match
+                type: mock
+
+          /{proxy+}:
+            x-amazon-apigateway-any-method:
+              parameters:
+              - name: proxy
+                in: 'path'
+                required: true
+                type: 'string'
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}:${EnvironmentParameter}/invocations:
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                cacheNamespace: Namespace
+                cachKeyParameters:
+                - method.request.path.proxy
+                type: aws_proxy
+  
+Outputs:
+  ApiUrl:
+    Description: !Sub
+      - The URL of the ${ServiceNameParameter} API endpoint.
+    Value: !Sub
+      - https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentParameter}
+  
+    
