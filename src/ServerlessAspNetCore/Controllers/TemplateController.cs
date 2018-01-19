@@ -1,4 +1,6 @@
 using System.Threading.Tasks;
+using Amazon.Lambda.AspNetCoreServer;
+using Amazon.Lambda.Core;
 using Microsoft.AspNetCore.Mvc;
 using ServerlessAspNetCore.Models;
 
@@ -14,7 +16,7 @@ namespace ServerlessAspNetCore.Controllers
             await Task.CompletedTask;
             var templates = new[]
             {
-                new Template {BoolProperty = true, IntProperty = 1, StringProperty = "String1"},
+                new Template {BoolProperty = true, IntProperty = 1, StringProperty = ((ILambdaContext) HttpContext.Items[APIGatewayProxyFunction.LAMBDA_CONTEXT]).InvokedFunctionArn},
                 new Template {BoolProperty = false, IntProperty = 2, StringProperty = "String2"}
             };
             return Ok(templates);

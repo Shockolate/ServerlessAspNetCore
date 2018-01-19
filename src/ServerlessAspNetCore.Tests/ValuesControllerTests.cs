@@ -1,26 +1,16 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
-
-using Xunit;
-using Amazon.Lambda.Core;
-using Amazon.Lambda.TestUtilities;
 using Amazon.Lambda.APIGatewayEvents;
-
+using Amazon.Lambda.TestUtilities;
 using Newtonsoft.Json;
-
-using ServerlessAspNetCore;
-
+using NUnit.Framework;
 
 namespace ServerlessAspNetCore.Tests
 {
+    [TestFixture]
     public class ValuesControllerTests
     {
-
-
-        [Fact]
+        [Test]
         public async Task TestGet()
         {
             var lambdaFunction = new LambdaEntryPoint();
@@ -30,12 +20,10 @@ namespace ServerlessAspNetCore.Tests
             var context = new TestLambdaContext();
             var response = await lambdaFunction.FunctionHandlerAsync(request, context);
 
-            Assert.Equal(response.StatusCode, 200);
-            Assert.Equal("[\"value1\",\"value2\"]", response.Body);
-            Assert.True(response.Headers.ContainsKey("Content-Type"));
-            Assert.Equal("application/json; charset=utf-8", response.Headers["Content-Type"]);
+            Assert.AreEqual(response.StatusCode, 200);
+            Assert.AreEqual("[\"value1\",\"value2\"]", response.Body);
+            Assert.IsTrue(response.Headers.ContainsKey("Content-Type"));
+            Assert.AreEqual("application/json; charset=utf-8", response.Headers["Content-Type"]);
         }
-
-
     }
 }

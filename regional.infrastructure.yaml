@@ -1,0 +1,31 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Regional Domain Name and BaseMapping for a region's API Gateway
+Parameters:
+  DomainNameParameter:
+    Type: String
+    Description: The Easy To Read Domain name for the regional API.
+  RegionalCertificateArnParameter:
+    Type: String
+    Description: The ACM Certificate ARN for the region.
+  RegionalApiIdParameter:
+    Type: String
+    Description: The API Gateway ID of the regional endpoint.
+
+Resources:
+  ApiRegionalDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref DomainNameParameter
+      EndpointConfiguration:
+        Types:
+        - REGIONAL
+      RegionalCertificateArn: !Ref RegionalCertificateArnParameter
+  
+  ApiRegionalBaseMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !Ref ApiRegionalDomainName
+      RestApiId: !Ref RegionalApiIdParameter
+      Stage: production

@@ -1,0 +1,382 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Transform": "AWS::Serverless-2016-10-31",
+  "Description": "An AWS Serverless Application that uses the ASP.NET Core framework running in Amazon Lambda.",
+  "Parameters": {
+    "ServiceNameParameter": {
+      "Type": "String",
+      "Default": "Template",
+      "Description": "Enter the service name. Must be the same as the .csproj for it will be used in referencing the namespace & assembly. Default is Template."
+    },
+    "EnvironmentParameter": {
+      "Type": "String",
+      "Default": "dev",
+      "Description": "Enter the environment. Default is dev."
+    }
+  },
+  "Globals": {
+    "Function": {
+      "Runtime": "dotnetcore2.0",
+      "Timeout": 60,
+      "MemorySize": 1024,
+      "VpcConfig": {
+        "SecurityGroupIds": [
+          {
+            "Fn::ImportValue": {
+              "Fn::Sub": "CommonInfrastructure:SecurityGroupId"
+            }
+          }
+        ],
+        "SubnetIds": {
+          "Fn::Split": [
+            ",",
+            {
+              "Fn::ImportValue": "PrimaryVPC:PrivateSubnetIds"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Resources": {
+    "LambdaFunction": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${ServiceNameParameter}"
+        },
+        "Handler": {
+          "Fn::Sub": "${ServiceNameParameter}::${ServiceNameParameter}.LambdaEntryPoint::FunctionHandlerAsync"
+        },
+        "CodeUri": "",
+        "Role": {
+          "Fn::ImportValue": "CommonInfrastructure:ServerlessExecutionRole"
+        },
+        "Description": {
+          "Fn::Sub": "Backing Lambda for the ${ServiceNameParameter} in ${AWS::Region}."
+        },
+        "AutoPublishAlias": {
+          "Ref": "EnvironmentParameter"
+        },
+        "Tracing": "PassThrough"
+      }
+    },
+    "ApiGatewayApi": {
+      "Type": "AWS::Serverless::Api",
+      "Properties": {
+        "StageName": {
+          "Ref": "EnvironmentParameter"
+        },
+        "DefinitionBody": {
+          "swagger": "2.0",
+          "info": {
+            "title": {
+              "Ref": "ServiceNameParameter"
+            }
+          },
+          "schemes": [
+            "https"
+          ],
+          "consumes": [
+            "application/json"
+          ],
+          "produces": [
+            "application/json"
+          ],
+          "paths": {
+            "/ping": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "Successful canary check",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "headers": {
+                      "X-Requested-With": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Origin": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Methods": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Headers": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-integration": {
+                  "requestTemplates": {
+                    "application/json": "{\"statusCode\": 200}"
+                  },
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseTemplates": {
+                        "application/json": "\"pong\""
+                      },
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'",
+                        "method.response.header.X-Requested-With": "'*'",
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'",
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "type": "mock"
+                }
+              }
+            },
+            "/swagger": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "schema": {
+                      "type": "object"
+                    },
+                    "headers": {
+                      "X-Requested-With": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Origin": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Methods": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Headers": {
+                        "type": "string"
+                      },
+                      "Content-Type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-integration": {
+                  "uri": "https://s3-eu-west-1.amazonaws.com/swagger-ui.shop.cimpress.io/index.html",
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'",
+                        "method.response.header.Content-Type": "integration.response.header.Content-Type",
+                        "method.response.header.X-Requested-With": "'*'",
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'",
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "httpMethod": "GET",
+                  "type": "http"
+                }
+              },
+              "options": {
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "schema": {
+                      "type": "object"
+                    },
+                    "headers": {
+                      "X-Requested-With": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Origin": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Methods": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Headers": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-integration": {
+                  "requestTemplates": {
+                    "application/json": "{\"statusCode\": 200}"
+                  },
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'",
+                        "method.response.header.X-Requested-With": "'*'",
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'",
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "type": "mock"
+                }
+              }
+            },
+            "/swagger/file": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "headers": {
+                      "X-Requested-With": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Origin": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Methods": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Headers": {
+                        "type": "string"
+                      },
+                      "Content-Type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-integration": {
+                  "uri": {
+                    "Fn::Sub": [
+                      "https://s3-${Region}.amazonaws.com/${Bucket}/swagger/${AppName}.swagger.yaml",
+                      {
+                        "Bucket": {
+                          "Fn::ImportValue": "CommonInfrastructure:ArtifactsBucket"
+                        },
+                        "AppName": {
+                          "Ref": "ServiceNameParameter"
+                        },
+                        "Region": {
+                          "Ref": "AWS::Region"
+                        }
+                      }
+                    ]
+                  },
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'",
+                        "method.response.header.Content-Type": "integration.response.header.Content-Type",
+                        "method.response.header.X-Requested-With": "'*'",
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'",
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "httpMethod": "GET",
+                  "type": "http"
+                }
+              },
+              "options": {
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "schema": {
+                      "type": "object"
+                    },
+                    "headers": {
+                      "X-Requested-With": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Origin": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Methods": {
+                        "type": "string"
+                      },
+                      "Access-Control-Allow-Headers": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-integration": {
+                  "requestTemplates": {
+                    "application/json": "{\"statusCode\": 200}"
+                  },
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'",
+                        "method.response.header.X-Requested-With": "'*'",
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'",
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "type": "mock"
+                }
+              }
+            },
+            "/{proxy+}": {
+              "x-amazon-apigateway-any-method": {
+                "parameters": [
+                  {
+                    "name": "proxy",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                  }
+                ],
+                "responses": {
+                },
+                "x-amazon-apigateway-integration": {
+                  "uri": {
+                    "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}:${EnvironmentParameter}/invocations"
+                  },
+                  "responses": {
+                    "default": {
+                      "statusCode": "200"
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "httpMethod": "POST",
+                  "cacheNamespace": "Namespace",
+                  "cachKeyParameters": [
+                    "method.request.path.proxy"
+                  ],
+                  "credentials": {
+                    "Fn::ImportValue": "CommonInfrastructure:ApiGatewayExecutionRole"
+                  },
+                  "type": "aws_proxy"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiUrl": {
+      "Description": "The URL of this stack's API endpoint.",
+      "Value": {
+        "Fn::Sub": "https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentParameter}"
+      }
+    },
+    "ApiId": {
+      "Description": "The API Gateway ID of the created endpoint.",
+      "Value": {
+        "Ref": "ApiGatewayApi"
+      }
+    }
+  }
+}

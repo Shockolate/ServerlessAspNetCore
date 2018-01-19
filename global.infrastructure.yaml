@@ -1,0 +1,45 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Global Domain Routing for a multi-regional serverless application.
+
+Parameters:
+  ServiceNameParameter:
+    Type: String
+    Default: Template
+    Description: Enter the service name. Must be the same as the .csproj for it will be used in referencing the namespace & assembly. Default is Template.
+  HostedZoneIdParameter:
+    Type: String
+    Description: The Hosted Zone Id where record sets will be created.
+  MultiRegionEndpointParameter:
+    Type: String
+    Description: The hostname of the multi-region endpoint
+  euwest1EndpointParameter:
+    Type: String
+    Description: the endpoint of the APIG in Ireland.
+  useast1EndpointParameter:
+    Type: String
+    Description: the endpoint of the APIG in N. Virginia
+
+Resources:
+  GlobalRecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      Comment: !Sub Global routing for ${ServiceNameParameter}
+      HostedZoneId: !Ref HostedZoneIdParameter
+      RecordSets:
+      - Region: us-east-1
+        SetIdentifier: !Sub ${ServiceNameParameter}-us-east-1-endpoint
+        Name: !Ref MultiRegionEndpointParameter
+        Type: CNAME
+        TTL: 60
+        ResourceRecords:
+        - !Ref useast1EndpointParameter
+      - Region: eu-west-1
+        SetIdentifier: !Sub ${ServiceNameParameter}-eu-west-1-endpoint
+        Name: !Ref MultiRegionEndpointParameter
+        Type: CNAME
+        TTL: 60
+        ResourceRecords:
+        - !Ref euwest1EndpointParameter
+

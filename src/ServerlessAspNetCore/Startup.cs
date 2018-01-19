@@ -12,21 +12,15 @@ namespace ServerlessAspNetCore
 {
     public class Startup
     {
-        public const string AppS3BucketKey = "AppS3Bucket";
-
         private readonly JsonSerializerSettings _jsonSerializerSettings =
             new JsonSerializerSettings {Formatting = Formatting.Indented, ContractResolver = new CamelCasePropertyNamesContractResolver()};
 
-        public Startup(IHostingEnvironment env)
+        public Startup(IConfiguration configuration)
         {
-            var builder = new ConfigurationBuilder().SetBasePath(env.ContentRootPath).AddJsonFile("appsettings.json", false, true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true);
-
-            builder.AddEnvironmentVariables();
-            Configuration = builder.Build();
+            Configuration = configuration;
         }
 
-        public static IConfigurationRoot Configuration { get; private set; }
+        public static IConfiguration Configuration { get; private set; }
 
         // This method gets called by the runtime. Use this method to add services to the container
         public void ConfigureServices(IServiceCollection services)
@@ -38,9 +32,8 @@ namespace ServerlessAspNetCore
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
-            loggerFactory.AddLambdaLogger(Configuration.GetLambdaLoggerOptions());
             app.UseMvc();
         }
     }
